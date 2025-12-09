@@ -41,10 +41,10 @@ def main():
     print("Press Ctrl + C to stop.\n")
 
     # ---- Configure assistant here ----
-    # 1) If you ONLY want offline behaviour (no OpenAI):
+    # 1) If you ONLY want offline behaviour (no Gemini):
     # assistant = AIVoiceAssistant(driver_name="praveen")
 
-    # 2) If you want to use OpenAI Assistants API:
+    # 2) If you want to use gemini_model Assistants API:
     assistant = AIVoiceAssistant(
         driver_name="praveen",
         use_cloud_assistant=True,              # must be True to use API
@@ -54,7 +54,7 @@ def main():
     assistant.speak(
         "Hello. I am your smart drowsiness assistant using microphone input. "
         "When I say listening, speak in English. "
-        "For example, say 'hello', 'how am I', 'test drowsy', or 'exit assistant'."
+        #"For example, say 'hello', 'how am I', 'test drowsy', or 'exit assistant'."
     )
 
     recognizer = sr.Recognizer()
