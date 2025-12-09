@@ -295,13 +295,25 @@ class AIVoiceAssistant:
     def handle_command_with_nlp_backend(self, user_text: str) -> None:
         """
         Entry point for mic / text input.
-        If cloud assistant is enabled, try it first.
-        Otherwise, or on failure, fall back to offline rules.
+
+        1) First handle local control commands (exit/quit etc.)
+        2) If cloud assistant is enabled, try Gemini.
+        3) On failure, fall back to offline rule-based commands.
         """
+        text_norm = (user_text or "").lower().strip()
+
+        # --- 1. Local control commands (always handled offline) ---
+        if "exit" in text_norm or "quit" in text_norm or "stop assistant" in text_norm:
+            # This will speak "Stopping the assistant..." and raise SystemExit
+            self.handle_text_command(user_text)
+            return
+
+        # --- 2. If no cloud, just use offline rules ---
         if not self.use_cloud_assistant:
             self.handle_text_command(user_text)
             return
 
+        # --- 3. Try Gemini first ---
         response = self._ask_cloud_assistant(user_text)
         if response:
             self.speak(response)
@@ -310,3 +322,4 @@ class AIVoiceAssistant:
                 "I could not reach the cloud assistant. I will use my offline commands instead."
             )
             self.handle_text_command(user_text)
+
