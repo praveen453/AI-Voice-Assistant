@@ -6,7 +6,7 @@ import pyttsx3
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-#  Gemini cloud assistant (optional)
+# Gemini cloud assistant (optional)
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -35,11 +35,11 @@ class AIVoiceAssistant:
         self.driver_name = driver_name or "driver"
         self.language = language
 
-        # ---- Offline TTS setup (ONE shared engine) 
+        # Offline TTS setup (ONE shared engine) 
         self.engine = pyttsx3.init("sapi5")
         self._configure_engine()
 
-        # ---- Cloud assistant setup (Gemini, optional) ----
+        # Cloud assistant setup (Gemini, optional)
         self.use_cloud_assistant = use_cloud_assistant and GEMINI_AVAILABLE
         self.gemini_model_name = gemini_model_name
         self.gemini_model = None
@@ -149,7 +149,7 @@ class AIVoiceAssistant:
             f"{name}, I detected signs of drowsiness. Please stay alert."
         )
 
-        # --- Add contextual info ---
+        # Add contextual info 
         speed = context.get("speed")
         weather = context.get("weather")
         location_hint = context.get("location_hint")
