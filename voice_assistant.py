@@ -4,25 +4,27 @@ import os
 import time
 import pyttsx3
 from datetime import datetime
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any
 
-if TYPE_CHECKING:
-    from openai import OpenAI
+
+#  Gemini cloud assistant (optional)
 
 try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    GEMINI_AVAILABLE = False
+    genai = None  # type: ignore
 
 
 class AIVoiceAssistant:
     """
     AI Voice Assistant module for the drowsiness detection system.
+
     - Offline TTS using pyttsx3.
     - Context-aware drowsiness alerts (level + speed + weather + time).
     - Simple rule-based text commands (offline).
-    - Optional OpenAI Assistants API integration for richer responses.
+    - Optional Gemini cloud integration for richer responses.
     """
 
     def __init__(
@@ -30,34 +32,36 @@ class AIVoiceAssistant:
         driver_name: Optional[str] = None,
         language: str = "en",
         use_cloud_assistant: bool = False,
-        assistant_id: Optional[str] = None,
+        gemini_model_name: str = "gemini-2.5-flash",  # e.g. gemini-1.5-pro
     ) -> None:
         self.driver_name = driver_name or "driver"
         self.language = language
 
         # ---- Offline TTS setup ----
-        self.engine = pyttsx3.init()
-        # ---- Cloud assistant setup (optional) ----
-        self.use_cloud_assistant = use_cloud_assistant and OPENAI_AVAILABLE
-        self.assistant_id = assistant_id
-        self.client: Optional["OpenAI"] = None
-        self.assistant_id = assistant_id
-        self.client: Optional[OpenAI] = None
+        # (we re-init engine in speak(), but keep one here for safety)
+        self.engine = pyttsx3.init("sapi5")
+        self._configure_engine()
+
+        # ---- Cloud assistant setup (Gemini, optional) ----
+        self.use_cloud_assistant = use_cloud_assistant and GEMINI_AVAILABLE
+        self.gemini_model_name = gemini_model_name
+        self.gemini_model = None
 
         if self.use_cloud_assistant:
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
-                print("[VoiceAssistant] OPENAI_API_KEY not found. Disabling cloud assistant.")
-                self.use_cloud_assistant = False
-            elif not self.assistant_id:
-                print("[VoiceAssistant] assistant_id not provided. Disabling cloud assistant.")
+                print("[VoiceAssistant] GEMINI_API_KEY not found. Disabling cloud assistant.")
                 self.use_cloud_assistant = False
             else:
                 try:
-                    self.client = OpenAI()
-                    print("[VoiceAssistant] Cloud assistant enabled.")
+                    genai.configure(api_key=api_key)
+                    self.gemini_model = genai.GenerativeModel(self.gemini_model_name)
+                    print(
+                        f"[VoiceAssistant] Gemini cloud assistant enabled "
+                        f"({self.gemini_model_name})."
+                    )
                 except Exception as e:
-                    print(f"[VoiceAssistant] Failed to init OpenAI client: {e}")
+                    print(f"[VoiceAssistant] Failed to init Gemini model: {e}")
                     self.use_cloud_assistant = False
 
     # -------------------------------------------------
@@ -73,10 +77,9 @@ class AIVoiceAssistant:
             volume = self.engine.getProperty("volume")
             self.engine.setProperty("volume", min(1.0, volume + 0.2))
 
-            # Optional: pick specific voice
-            # voices = self.engine.getProperty("voices")
-            # if voices:
-            #     self.engine.setProperty("voice", voices[0].id)
+            voices = self.engine.getProperty("voices")
+            if voices:
+                self.engine.setProperty("voice", voices[0].id)
         except Exception as e:
             print(f"[VoiceAssistant] Warning: could not configure engine: {e}")
 
@@ -85,16 +88,17 @@ class AIVoiceAssistant:
     # -------------------------------------------------
 
     def speak(self, text: str) -> None:
-        """Print + speak the given text (re-init engine each time to avoid silent bug)."""
+        """
+        Print + speak the given text.
+        We re-create a fresh engine each time to avoid the "silent after first speak" bug.
+        """
         if not text:
             return
 
         print(f"[Assistant] {text}")
 
         try:
-            # 🔁 create fresh engine for every utterance
-            engine = pyttsx3.init("sapi5")  # or just pyttsx3.init() if you didn't force sapi5
-            # basic config
+            engine = pyttsx3.init("sapi5")
             rate = engine.getProperty("rate")
             engine.setProperty("rate", max(100, rate - 25))
             engine.setProperty("volume", 1.0)
@@ -110,9 +114,7 @@ class AIVoiceAssistant:
             print(f"[VoiceAssistant] TTS error: {e}")
 
 
-    # -------------------------------------------------
     # Drowsiness-related logic
-    # -------------------------------------------------
 
     def build_drowsiness_message(
         self,
@@ -241,64 +243,46 @@ class AIVoiceAssistant:
                 "This is only a prototype."
             )
 
-    # -------------------------------------------------
-    # Cloud / Assistants API-backed handling (optional)
-    # -------------------------------------------------
+    
+    # Cloud / Gemini-backed handling (optional)
 
     def _ask_cloud_assistant(self, user_text: str) -> Optional[str]:
         """
-        Send text to OpenAI Assistants API and return response text, or None on failure.
+        Send text to Gemini and return response text, or None on failure.
         """
-        if not (self.use_cloud_assistant and self.client and self.assistant_id):
+        if not (self.use_cloud_assistant and self.gemini_model):
             return None
 
         try:
-            # 1. Create a new thread
-            thread = self.client.beta.threads.create()
-
-            # 2. Add user's message
-            self.client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=user_text,
+            prompt = (
+                "You are a driving safety and drowsiness assistant. "
+                "Give short, clear spoken responses suitable to read aloud to a driver. "
+                "Avoid long paragraphs. "
+                "Now answer this:\n\n"
+                f"Driver said: {user_text}"
             )
 
-            # 3. Run the assistant
-            run = self.client.beta.threads.runs.create(
-                thread_id=thread.id,
-                assistant_id=self.assistant_id,
-            )
+            response = self.gemini_model.generate_content(prompt)
 
-            # 4. Poll until completed or failed
-            while True:
-                run = self.client.beta.threads.runs.retrieve(
-                    thread_id=thread.id,
-                    run_id=run.id,
-                )
-                if run.status in ("completed", "failed", "cancelled", "expired"):
-                    break
-                time.sleep(0.5)
+            # Prefer response.text if available
+            text = getattr(response, "text", None)
+            if text:
+                return text.strip()
 
-            if run.status != "completed":
-                return None
+            # Fallback: use first candidate parts
+            if hasattr(response, "candidates") and response.candidates:
+                parts = response.candidates[0].content.parts
+                joined = " ".join(getattr(p, "text", "") for p in parts)
+                joined = joined.strip()
+                if joined:
+                    return joined
 
-            # 5. Get the latest assistant message
-            messages = self.client.beta.threads.messages.list(thread_id=thread.id)
-            latest = messages.data[0]
+            return None
 
-            text_parts = []
-            for part in latest.content:
-                if part.type == "text":
-                    text_parts.append(part.text.value)
-
-            answer = " ".join(text_parts).strip()
-            return answer or None
-        
         except Exception as e:
-            print(f"[VoiceAssistant] Error in cloud assistant: {e}")
-            print("==== CLOUD ASSISTANT ERROR ====")
+            print("==== GEMINI CLOUD ERROR ====")
             print(repr(e))
-            print("===============================")
+            print("================================")
             return None
 
     def handle_command_with_nlp_backend(self, user_text: str) -> None:

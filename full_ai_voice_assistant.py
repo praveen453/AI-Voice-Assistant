@@ -42,13 +42,13 @@ def main():
 
     # ---- Configure assistant here ----
     # 1) If you ONLY want offline behaviour (no OpenAI):
-    # assistant = AIVoiceAssistant(driver_name="Nimal")
+    # assistant = AIVoiceAssistant(driver_name="praveen")
 
     # 2) If you want to use OpenAI Assistants API:
     assistant = AIVoiceAssistant(
         driver_name="praveen",
         use_cloud_assistant=True,              # must be True to use API
-        assistant_id="asst_52I4wLfLNGoST6knapDwAwO7"  # TODO: replace with your real ID
+        gemini_model_name="gemini-2.5-flash"  # TODO: replace with your real ID
     )
 
     assistant.speak(
