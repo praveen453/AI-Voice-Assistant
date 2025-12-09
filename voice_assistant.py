@@ -86,7 +86,9 @@ class AIVoiceAssistant:
     def speak(self, text: str) -> None:
         """
         Print + speak the given text.
-        Use one shared pyttsx3 engine and restart it if something goes wrong.
+
+        For the PC prototype we use Windows System.Speech via PowerShell,
+        because pyttsx3 is sometimes silent after the first utterance.
         """
         if not text:
             return
@@ -94,20 +96,28 @@ class AIVoiceAssistant:
         print(f"[Assistant] {text}")
 
         try:
-            # stop any previous utterance (just in case)
-            self.engine.stop()
-            self.engine.say(text)
-            self.engine.runAndWait()
+            import subprocess
+            import json
+
+            # JSON encode the text so quotes etc. are safely escaped
+            ps_text = json.dumps(text)
+
+            cmd = [
+                "powershell",
+                "-Command",
+                (
+                    "Add-Type -AssemblyName System.Speech; "
+                    "$speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    "$speak.Rate = 2; "      # little slower than normal
+                    "$speak.Volume = 100; "
+                    f"$speak.Speak({ps_text});"
+                ),
+            ]
+
+            subprocess.run(cmd, check=False)
         except Exception as e:
-            print(f"[VoiceAssistant] TTS error on first try: {e}")
-            # try re-create engine once
-            try:
-                self.engine = pyttsx3.init("sapi5")
-                self._configure_engine()
-                self.engine.say(text)
-                self.engine.runAndWait()
-            except Exception as e2:
-                print(f"[VoiceAssistant] TTS error after re-init: {e2}")
+            print(f"[VoiceAssistant] TTS error (System.Speech): {e}")
+
 
     
     # Drowsiness-related logic
