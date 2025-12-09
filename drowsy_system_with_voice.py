@@ -6,9 +6,9 @@ import joblib   # or from tensorflow import keras etc.
 
 from voice_assistant import AIVoiceAssistant
 
-# =========================
+
 # 1. Load ML model
-# =========================
+
 
 MODEL_PATH = "models/drowsy_model.pkl"   # <<< oyāge real path eka dapan
 
@@ -16,15 +16,15 @@ print("[System] Loading drowsiness model...")
 model = joblib.load(MODEL_PATH)
 print("[System] Model loaded.")
 
-# =========================
+
 # 2. Create voice assistant
-# =========================
+
 
 assistant = AIVoiceAssistant(driver_name="Praveen")
 
-# =========================
+
 # Helper: feature extraction
-# =========================
+
 
 def extract_features(frame):
     """
@@ -55,9 +55,9 @@ def get_weather():
     return "clear"
 
 
-# =========================
+
 # 3. Main camera + detection loop
-# =========================
+
 
 cap = cv2.VideoCapture(0)
 
@@ -77,9 +77,9 @@ try:
             print("[System] extract_features() not implemented yet.")
             break
 
-        # -------------------------------
+        
         # 3.1 Predict drowsiness
-        # -------------------------------
+        
         # Example for sklearn model with predict_proba
         prob_sleepy = model.predict_proba([features])[0][1]  # sleepy class prob
 
@@ -93,9 +93,9 @@ try:
         else:
             level = None  # not drowsy
 
-        # -------------------------------
+        
         # 3.2 Trigger voice assistant
-        # -------------------------------
+        
         now = time.time()
 
         if level is not None and (now - last_alert_time) > ALERT_COOLDOWN:
