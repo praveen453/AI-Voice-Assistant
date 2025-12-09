@@ -302,24 +302,29 @@ class AIVoiceAssistant:
         """
         text_norm = (user_text or "").lower().strip()
 
-        # 1. Local control commands (always handled offline) 
+        # --- 1. Local control commands (always handled offline) ---
         if "exit" in text_norm or "quit" in text_norm or "stop assistant" in text_norm:
             # This will speak "Stopping the assistant..." and raise SystemExit
             self.handle_text_command(user_text)
             return
 
-        # 2. If no cloud, just use offline rules 
+        # --- 2. If no cloud, just use offline rules ---
         if not self.use_cloud_assistant:
             self.handle_text_command(user_text)
             return
 
-        # 3. Try Gemini first
+        # --- 3. Try Gemini first (ONLINE MODE) ---
         response = self._ask_cloud_assistant(user_text)
+
         if response:
+            # ✅ Online API working → speak Gemini answer
             self.speak(response)
         else:
+            # ❌ API failed / no response → auto offline fallback
             self.speak(
-                "I could not reach the cloud assistant. I will use my offline commands instead."
+                "I could not reach the online assistant. "
+                "I will use my offline commands instead."
             )
             self.handle_text_command(user_text)
+
 
