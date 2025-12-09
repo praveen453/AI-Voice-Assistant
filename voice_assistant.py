@@ -6,9 +6,7 @@ import pyttsx3
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-
 #  Gemini cloud assistant (optional)
-
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -32,13 +30,12 @@ class AIVoiceAssistant:
         driver_name: Optional[str] = None,
         language: str = "en",
         use_cloud_assistant: bool = False,
-        gemini_model_name: str = "gemini-2.5-flash",  # e.g. gemini-1.5-pro
+        gemini_model_name: str = "gemini-2.5-flash",
     ) -> None:
         self.driver_name = driver_name or "driver"
         self.language = language
 
-        # ---- Offline TTS setup ----
-        # (we re-init engine in speak(), but keep one here for safety)
+        # ---- Offline TTS setup (ONE shared engine) 
         self.engine = pyttsx3.init("sapi5")
         self._configure_engine()
 
@@ -64,9 +61,9 @@ class AIVoiceAssistant:
                     print(f"[VoiceAssistant] Failed to init Gemini model: {e}")
                     self.use_cloud_assistant = False
 
-    # -------------------------------------------------
+    
     # Internal helpers
-    # -------------------------------------------------
+    
 
     def _configure_engine(self) -> None:
         """Tune voice rate and volume (non-irritating but clear)."""
@@ -74,8 +71,7 @@ class AIVoiceAssistant:
             rate = self.engine.getProperty("rate")
             self.engine.setProperty("rate", max(100, rate - 25))
 
-            volume = self.engine.getProperty("volume")
-            self.engine.setProperty("volume", min(1.0, volume + 0.2))
+            self.engine.setProperty("volume", 1.0)
 
             voices = self.engine.getProperty("voices")
             if voices:
@@ -83,14 +79,14 @@ class AIVoiceAssistant:
         except Exception as e:
             print(f"[VoiceAssistant] Warning: could not configure engine: {e}")
 
-    # -------------------------------------------------
+  
     # Core TTS
-    # -------------------------------------------------
+    
 
     def speak(self, text: str) -> None:
         """
         Print + speak the given text.
-        We re-create a fresh engine each time to avoid the "silent after first speak" bug.
+        Use one shared pyttsx3 engine and restart it if something goes wrong.
         """
         if not text:
             return
@@ -98,23 +94,24 @@ class AIVoiceAssistant:
         print(f"[Assistant] {text}")
 
         try:
-            engine = pyttsx3.init("sapi5")
-            rate = engine.getProperty("rate")
-            engine.setProperty("rate", max(100, rate - 25))
-            engine.setProperty("volume", 1.0)
-
-            voices = engine.getProperty("voices")
-            if voices:
-                engine.setProperty("voice", voices[0].id)
-
-            engine.say(text)
-            engine.runAndWait()
-            engine.stop()
+            # stop any previous utterance (just in case)
+            self.engine.stop()
+            self.engine.say(text)
+            self.engine.runAndWait()
         except Exception as e:
-            print(f"[VoiceAssistant] TTS error: {e}")
+            print(f"[VoiceAssistant] TTS error on first try: {e}")
+            # try re-create engine once
+            try:
+                self.engine = pyttsx3.init("sapi5")
+                self._configure_engine()
+                self.engine.say(text)
+                self.engine.runAndWait()
+            except Exception as e2:
+                print(f"[VoiceAssistant] TTS error after re-init: {e2}")
 
-
+    
     # Drowsiness-related logic
+    
 
     def build_drowsiness_message(
         self,
@@ -196,9 +193,8 @@ class AIVoiceAssistant:
         msg = self.build_drowsiness_message(level, context)
         self.speak(msg)
 
-    # -------------------------------------------------
     # Offline rule-based command handling
-    # -------------------------------------------------
+   
 
     def handle_text_command(self, user_text: str) -> None:
         """
@@ -243,8 +239,9 @@ class AIVoiceAssistant:
                 "This is only a prototype."
             )
 
-    
+   
     # Cloud / Gemini-backed handling (optional)
+   
 
     def _ask_cloud_assistant(self, user_text: str) -> Optional[str]:
         """
