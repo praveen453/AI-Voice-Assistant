@@ -48,7 +48,7 @@ def main():
     assistant = AIVoiceAssistant(
         driver_name="praveen",
         use_cloud_assistant=True,              # must be True to use API
-        gemini_model_name="gemini-2.5-flash"  # TODO: replace with your real ID
+        gemini_model_name="gemini-2.5-flash"  
     )
 
     assistant.speak(
