@@ -11,14 +11,14 @@ import speech_recognition as sr
 from voice_assistant import AIVoiceAssistant
 from dotenv import load_dotenv
 load_dotenv()
-# -----------------------------
+
 # TensorFlow log level
-# -----------------------------
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-# -----------------------------
+
 # Model & detection settings
-# -----------------------------
+
 MODEL_PATH = "Models/drowsiness_model_mobilenet.h5"
 LABELS = ["Drowsy", "Non-Drowsy"]
 IMG_SIZE = (224, 224)
@@ -30,9 +30,9 @@ ALERT_COOLDOWN = 3.0            # seconds between alerts
 # MIC index (use same index from mic_test.py)
 MIC_INDEX = 5    # change if your working mic index is different
 
-# -----------------------------
+
 # Global state
-# -----------------------------
+
 closed_frames = 0
 invert_logic = False
 start_time = time.time()
@@ -42,27 +42,27 @@ last_alert_time = 0.0
 conversation_mode = False       # are we in continuous talk mode?
 conversation_thread = None
 
-# -----------------------------
+
 # Voice assistant (Gemini + offline fallback)
-# -----------------------------
+
 assistant = AIVoiceAssistant(
     driver_name="Praveen",
     use_cloud_assistant=True,           # use Gemini if API key ok
     gemini_model_name="gemini-2.5-flash"
 )
 
-# -----------------------------
+
 # Context helpers (for proposal)
-# -----------------------------
+
 def get_speed() -> float:
     return 60.0
 
 def get_weather() -> str:
     return "clear"
 
-# -----------------------------
+
 # One-shot drowsy alert (no blocking)
-# -----------------------------
+
 def trigger_voice_alert(level: str | None, custom_message: str | None = None):
     """
     Non-blocking wrapper: speak a drowsiness alert in a background thread.
@@ -106,9 +106,9 @@ def trigger_voice_alert(level: str | None, custom_message: str | None = None):
 
     threading.Thread(target=_run, daemon=True).start()
 
-# ==========================================================
+
 #  Continuous conversation loop (runs in background thread)
-# ==========================================================
+
 def listen_once(recognizer: sr.Recognizer, microphone: sr.Microphone) -> str:
     """Listen once from mic and return recognized text."""
     with microphone as source:
@@ -191,9 +191,9 @@ def start_conversation_mode():
     conversation_thread = threading.Thread(target=conversation_loop, daemon=True)
     conversation_thread.start()
 
-# -----------------------------
+
 # Main application
-# -----------------------------
+
 def main():
     global closed_frames, invert_logic, start_time
 
@@ -274,7 +274,7 @@ def main():
                     1,
                 )
 
-            # --- 2) CNN inference ---
+            #  2) CNN inference 
             try:
                 face_img = frame[y:y + h, x:x + w]
                 face_img_rgb = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
@@ -301,7 +301,7 @@ def main():
                 cnn_status = "Error"
                 is_cnn_drowsy = False
 
-            # --- 3) Final status & voice behaviour ---
+            #  3) Final status & voice behaviour 
             final_status = "Scanning..."
             alert_color = (0, 255, 0)
 

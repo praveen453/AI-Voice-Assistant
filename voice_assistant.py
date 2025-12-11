@@ -8,9 +8,9 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 load_dotenv()
-# -------------------------------------------------
+
 # Gemini cloud assistant (optional)
-# -------------------------------------------------
+
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -63,9 +63,9 @@ class AIVoiceAssistant:
                     print(f"[VoiceAssistant] Failed to init Gemini model: {e}")
                     self.use_cloud_assistant = False
 
-    # -------------------------------------------------
+ 
     # Offline voice settings
-    # -------------------------------------------------
+   
     def _configure_engine(self) -> None:
         try:
             self.engine.setProperty("rate", 150)
@@ -73,9 +73,9 @@ class AIVoiceAssistant:
         except Exception as e:
             print(f"[VoiceAssistant] Could not configure TTS: {e}")
 
-    # -------------------------------------------------
+    
     # SPEAK FUNCTION (Windows System.Speech)
-    # -------------------------------------------------
+   
     def speak(self, text: str) -> None:
         if not text:
             return
@@ -102,9 +102,9 @@ class AIVoiceAssistant:
         except Exception as e:
             print(f"[VoiceAssistant] TTS error: {e}")
 
-    # -------------------------------------------------
+
     # BUILD DROWSINESS MESSAGE
-    # -------------------------------------------------
+ 
     def build_drowsiness_message(self, level: str, context: Optional[Dict[str, Any]] = None) -> str:
         context = context or {}
         name = self.driver_name
@@ -139,16 +139,16 @@ class AIVoiceAssistant:
 
         return msg
 
-    # -------------------------------------------------
+  
     # ALERT DROWSINESS
-    # -------------------------------------------------
+    
     def alert_drowsiness(self, level: str, context: Optional[Dict[str, Any]] = None) -> None:
         msg = self.build_drowsiness_message(level, context)
         self.speak(msg)
 
-    # -------------------------------------------------
+    
     # OFFLINE COMMAND HANDLER
-    # -------------------------------------------------
+   
     def handle_text_command(self, user_text: str) -> None:
         t = (user_text or "").lower().strip()
 
@@ -166,9 +166,9 @@ class AIVoiceAssistant:
         else:
             self.speak("I did not understand that command.")
 
-    # -------------------------------------------------
+    
     # CLOUD NLP (Gemini)
-    # -------------------------------------------------
+    
     def _ask_cloud_assistant(self, user_text: str) -> Optional[str]:
         if not (self.use_cloud_assistant and self.gemini_model):
             return None
@@ -198,9 +198,9 @@ class AIVoiceAssistant:
             print("======================")
             return None
 
-    # -------------------------------------------------
+   
     # MAIN NLP ENTRY (ONLINE → OFFLINE FALLBACK)
-    # -------------------------------------------------
+
     def handle_command_with_nlp_backend(self, user_text: str) -> None:
         t = (user_text or "").lower().strip()
 
