@@ -9,7 +9,8 @@ import time
 import speech_recognition as sr
 
 from voice_assistant import AIVoiceAssistant
-
+from dotenv import load_dotenv
+load_dotenv()
 # -----------------------------
 # TensorFlow log level
 # -----------------------------
@@ -143,10 +144,10 @@ def conversation_loop():
         microphone = sr.Microphone()
 
     # Initial instruction to driver
-    assistant.speak(
-        "Praveen, I will stay with you and keep talking while you are driving. "
-        "You can ask me questions. If you want me to stop talking, say 'exit assistant'."
-    )
+    #assistant.speak(
+    #    "Praveen, I will stay with you and keep talking while you are driving. "
+    #    "You can ask me questions. If you want me to stop talking, say 'exit assistant'."
+   # )
 
     while conversation_mode:
         text = listen_once(recognizer, microphone)
