@@ -40,7 +40,7 @@ def main():
     print("=== FULL AI VOICE ASSISTANT (MIC + API VERSION) ===")
     print("Press Ctrl + C to stop.\n")
 
-    # ---- Configure assistant here ----
+    # ---- Configure assistant here 
     # 1) If you ONLY want offline behaviour (no Gemini):
     # assistant = AIVoiceAssistant(driver_name="praveen")
 

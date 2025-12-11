@@ -28,7 +28,7 @@ WARMUP_DURATION = 5.0           # seconds before any alert
 ALERT_COOLDOWN = 3.0            # seconds between alerts
 
 # MIC index (use same index from mic_test.py)
-MIC_INDEX = 5    # change if your working mic index is different
+MIC_INDEX = 1    # change if your working mic index is different
 
 
 # Global state
