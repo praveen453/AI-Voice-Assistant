@@ -2,12 +2,13 @@
 
 import os
 import time
+import pyttsx3
 from datetime import datetime
 from typing import Optional, Dict, Any
-import subprocess
 
-
+# -------------------------------------------------
 # Gemini cloud assistant (optional)
+# -------------------------------------------------
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -20,12 +21,11 @@ class AIVoiceAssistant:
     """
     AI Voice Assistant module for the drowsiness detection system.
 
-    - Offline TTS using Windows System.Speech (via PowerShell).
+    - Offline TTS using Windows System.Speech (called via PowerShell).
     - Context-aware drowsiness alerts (level + speed + weather + time).
     - Simple rule-based text commands (offline).
     - Optional Gemini cloud integration for richer responses.
-      *Both drowsiness alerts and free chat can use the API.*
-      If API fails, system falls back to offline messages.
+      (Auto–fallback to offline if API / internet fails.)
     """
 
     def __init__(
@@ -37,6 +37,10 @@ class AIVoiceAssistant:
     ) -> None:
         self.driver_name = driver_name or "driver"
         self.language = language
+
+        # ---- Offline TTS base engine (not used directly in speak, but kept) ----
+        self.engine = pyttsx3.init("sapi5")
+        self._configure_engine()
 
         # ---- Cloud assistant setup (Gemini, optional) ----
         self.use_cloud_assistant = use_cloud_assistant and GEMINI_AVAILABLE
@@ -61,38 +65,64 @@ class AIVoiceAssistant:
                     self.use_cloud_assistant = False
 
     # -------------------------------------------------
+    # Internal helpers
+    # -------------------------------------------------
+
+    def _configure_engine(self) -> None:
+        """Tune base pyttsx3 voice rate/volume (backup, not main TTS)."""
+        try:
+            rate = self.engine.getProperty("rate")
+            self.engine.setProperty("rate", max(100, rate - 25))
+            self.engine.setProperty("volume", 1.0)
+
+            voices = self.engine.getProperty("voices")
+            if voices:
+                self.engine.setProperty("voice", voices[0].id)
+        except Exception as e:
+            print(f"[VoiceAssistant] Warning: could not configure engine: {e}")
+
+    # -------------------------------------------------
     # Core TTS
     # -------------------------------------------------
 
+    def speak(self, text: str) -> None:
+        """
+        Print + speak the given text.
 
+        For the PC prototype we use Windows System.Speech via PowerShell,
+        because pyttsx3 can sometimes be silent after the first utterance.
+        """
+        if not text:
+            return
 
-def speak(self, text: str) -> None:
-    """Use Microsoft Edge TTS for stable voice output."""
-    if not text:
-        return
+        print(f"[Assistant] {text}")
 
-    print(f"[Assistant] {text}")
+        try:
+            import subprocess
+            import json
 
-    try:
-        output_file = f"tts_{uuid.uuid4().hex}.mp3"
+            # Safely escape text for PowerShell
+            ps_text = json.dumps(text)
 
-        subprocess.run([
-            "python", "-m", "edge_tts",
-            "--voice", "en-US-GuyNeural",
-            "--text", text,
-            "--write-media", output_file
-        ], check=True)
+            cmd = [
+                "powershell",
+                "-Command",
+                (
+                    "Add-Type -AssemblyName System.Speech; "
+                    "$speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    # negative = slower, positive = faster (System.Speech uses -10..10)
+                    "$speak.Rate = 0; "
+                    "$speak.Volume = 100; "
+                    f"$speak.Speak({ps_text});"
+                ),
+            ]
 
-        # Play audio
-        if os.path.exists(output_file):
-            os.system(f'start {output_file}')
-
-    except Exception as e:
-        print(f"[VoiceAssistant] EDGE-TTS error: {e}")
-
+            subprocess.run(cmd, check=False)
+        except Exception as e:
+            print(f"[VoiceAssistant] TTS error (System.Speech): {e}")
 
     # -------------------------------------------------
-    # OFFLINE drowsiness message builder
+    # Drowsiness-related logic
     # -------------------------------------------------
 
     def build_drowsiness_message(
@@ -102,6 +132,7 @@ def speak(self, text: str) -> None:
     ) -> str:
         """
         Create a context-aware message based on drowsiness level and context.
+
         level: "low", "medium", "high"
         context keys (optional):
           - speed (km/h)
@@ -131,7 +162,7 @@ def speak(self, text: str) -> None:
             f"{name}, I detected signs of drowsiness. Please stay alert.",
         )
 
-        # Contextual information
+        # ---- Contextual information ----
         speed = context.get("speed")
         weather = context.get("weather")
         location_hint = context.get("location_hint")
@@ -155,85 +186,12 @@ def speak(self, text: str) -> None:
         if location_hint:
             message += f" There may be rest stops {location_hint}."
 
+        # Time-based reminder (late night)
         hour = datetime.now().hour
         if hour >= 23 or hour <= 5:
             message += " It is late at night, fatigue risk is higher."
 
         return message
-
-    # -------------------------------------------------
-    # CLOUD (Gemini) drowsiness message builder
-    # -------------------------------------------------
-
-    def _build_drowsiness_message_cloud(
-        self,
-        level: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """
-        If cloud assistant is enabled, ask Gemini to generate a spoken
-        warning based on drowsiness level + context.
-        Returns text or None on failure.
-        """
-        if not (self.use_cloud_assistant and self.gemini_model):
-            return None
-
-        context = context or {}
-        name = self.driver_name
-
-        level_text = {
-            "low": "mild drowsiness",
-            "medium": "moderate drowsiness",
-            "high": "severe and dangerous drowsiness",
-        }.get(level.lower(), "some drowsiness")
-
-        speed = context.get("speed")
-        weather = context.get("weather")
-        location_hint = context.get("location_hint")
-
-        parts = [f"The driver is {name}.",
-                 f"The system detected {level_text} while driving."]
-
-        if speed is not None:
-            parts.append(f"The estimated speed is {speed} kilometers per hour.")
-        if weather:
-            parts.append(f"The weather is {weather}.")
-        if location_hint:
-            parts.append(f"There may be rest areas {location_hint}.")
-
-        parts.append(
-            "Generate a short, clear warning sentence to speak to the driver. "
-            "Focus on safety, do not give long explanations."
-        )
-
-        prompt = " ".join(parts)
-
-        try:
-            response = self.gemini_model.generate_content(prompt)
-
-            text = getattr(response, "text", None)
-            if text:
-                return text.strip()
-
-            if hasattr(response, "candidates") and response.candidates:
-                segs = []
-                for p in response.candidates[0].content.parts:
-                    segs.append(getattr(p, "text", ""))
-                out = " ".join(segs).strip()
-                if out:
-                    return out
-
-            return None
-
-        except Exception as e:
-            print("==== GEMINI DROWSY ERROR ====")
-            print(repr(e))
-            print("================================")
-            return None
-
-    # -------------------------------------------------
-    # Public drowsiness alert API (used by ML model)
-    # -------------------------------------------------
 
     def alert_drowsiness(
         self,
@@ -241,28 +199,16 @@ def speak(self, text: str) -> None:
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Called by the drowsiness detection module.
+        Public method for the drowsiness detection module.
 
-        Behaviour:
-        - If cloud assistant is on → try Gemini to generate alert text.
-        - If API fails or is disabled → use offline template.
-        - Then speak the final message.
+        Example:
+            assistant.alert_drowsiness("medium", {"speed": 75, "weather": "rainy"})
         """
-        msg: Optional[str] = None
-
-        # 1) Try cloud (Gemini)
-        if self.use_cloud_assistant:
-            msg = self._build_drowsiness_message_cloud(level, context)
-
-        # 2) Fallback to offline template if cloud not used / failed
-        if not msg:
-            msg = self.build_drowsiness_message(level, context or {})
-
-        # 3) Speak the final text
+        msg = self.build_drowsiness_message(level, context)
         self.speak(msg)
 
     # -------------------------------------------------
-    # Offline rule-based commands (for mic / text chat)
+    # Offline rule-based command handling
     # -------------------------------------------------
 
     def handle_text_command(self, user_text: str) -> None:
@@ -280,7 +226,7 @@ def speak(self, text: str) -> None:
             self.speak("I did not hear any command.")
             return
 
-        # Exit / stop assistant
+        # Exit / stop assistant (always offline-handled)
         if "exit" in user_text or "quit" in user_text or "stop assistant" in user_text:
             self.speak("Stopping the assistant now. Drive safely.")
             raise SystemExit
@@ -313,12 +259,12 @@ def speak(self, text: str) -> None:
             )
 
     # -------------------------------------------------
-    # Generic cloud Q&A (for mic text)
+    # Cloud / Gemini-backed handling (optional)
     # -------------------------------------------------
 
     def _ask_cloud_assistant(self, user_text: str) -> Optional[str]:
         """
-        Generic Q&A via Gemini (driver questions).
+        Send text to Gemini and return response text, or None on failure.
         """
         if not (self.use_cloud_assistant and self.gemini_model):
             return None
@@ -334,10 +280,12 @@ def speak(self, text: str) -> None:
 
             response = self.gemini_model.generate_content(prompt)
 
+            # Prefer response.text if available
             text = getattr(response, "text", None)
             if text:
                 return text.strip()
 
+            # Fallback: join first candidate parts
             if hasattr(response, "candidates") and response.candidates:
                 parts = response.candidates[0].content.parts
                 joined = " ".join(getattr(p, "text", "") for p in parts)
@@ -348,7 +296,7 @@ def speak(self, text: str) -> None:
             return None
 
         except Exception as e:
-            print("==== GEMINI CHAT ERROR ====")
+            print("==== GEMINI CLOUD ERROR ====")
             print(repr(e))
             print("================================")
             return None
@@ -358,12 +306,12 @@ def speak(self, text: str) -> None:
         Entry point for mic / text input.
 
         1) First handle local control commands (exit / quit etc.).
-        2) If cloud assistant is enabled, try Gemini Q&A.
+        2) If cloud assistant is enabled, try Gemini.
         3) On failure or when cloud is disabled, fall back to offline rules.
         """
         text_norm = (user_text or "").lower().strip()
 
-        # 1. Local control commands (always offline, so exit works even offline)
+        # 1. Local control commands (always offline)
         if "exit" in text_norm or "quit" in text_norm or "stop assistant" in text_norm:
             self.handle_text_command(user_text)
             return
@@ -377,8 +325,10 @@ def speak(self, text: str) -> None:
         response = self._ask_cloud_assistant(user_text)
 
         if response:
+            # Online API working → speak Gemini answer
             self.speak(response)
         else:
+            # API failed / no response → auto offline fallback
             self.speak(
                 "I could not reach the online assistant. "
                 "I will use my offline commands instead."
