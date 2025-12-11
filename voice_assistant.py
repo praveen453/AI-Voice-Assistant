@@ -328,7 +328,7 @@ class AIVoiceAssistant:
             # Online API working → speak Gemini answer
             self.speak(response)
         else:
-            # API failed / no response → auto offline fallback
+            # API failed / no response → auto offline 
             self.speak(
                 "I could not reach the online assistant. "
                 "I will use my offline commands instead."
