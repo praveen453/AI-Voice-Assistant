@@ -6,7 +6,7 @@ from voice_assistant import AIVoiceAssistant
 
 # 🔴 VERY IMPORTANT:
 # Set this to the SAME mic index that worked in your mic_test.py
-MIC_INDEX = 3  # <-- CHANGE THIS
+MIC_INDEX = 5 # <-- CHANGE THIS
 
 
 def listen_for_command(
